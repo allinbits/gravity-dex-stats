@@ -9,5 +9,6 @@ require (
 	github.com/gravity-devs/liquidity v1.2.9
 	github.com/spf13/cobra v1.1.3
 	github.com/spf13/viper v1.7.1
+	github.com/tendermint/tendermint v0.34.11
 	google.golang.org/grpc v1.39.1
 )

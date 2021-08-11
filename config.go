@@ -10,9 +10,15 @@ var DefaultClientConfig = ClientConfig{}
 
 type ClientConfig struct {
 	GRPC GRPCConfig
+	RPC  RPCConfig
 }
 
 type GRPCConfig struct {
+	URL   string
+	Token string
+}
+
+type RPCConfig struct {
 	URL   string
 	Token string
 }

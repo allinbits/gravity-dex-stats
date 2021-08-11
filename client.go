@@ -3,20 +3,25 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strconv"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	grpctypes "github.com/cosmos/cosmos-sdk/types/grpc"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	liquiditytypes "github.com/gravity-devs/liquidity/x/liquidity/types"
+	abcitypes "github.com/tendermint/tendermint/abci/types"
+	rpcclient "github.com/tendermint/tendermint/rpc/client"
+	rpc "github.com/tendermint/tendermint/rpc/client/http"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/metadata"
 )
 
 type Client struct {
-	cfg      ClientConfig
-	grpcConn *grpc.ClientConn
+	cfg       ClientConfig
+	grpcConn  *grpc.ClientConn
+	rpcClient rpcclient.Client
 }
 
 func NewClient(cfg ClientConfig) (*Client, error) {
@@ -24,9 +29,23 @@ func NewClient(cfg ClientConfig) (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("dial grpc: %w", err)
 	}
+	httpClient := &http.Client{
+		Transport: AddTokenRoundTripper{
+			rt:    http.DefaultTransport,
+			token: cfg.RPC.Token,
+		},
+		CheckRedirect: nil,
+		Jar:           nil,
+		Timeout:       0,
+	}
+	rpcClient, err := rpc.NewWithClient(cfg.RPC.URL, "/websocket", httpClient)
+	if err != nil {
+		return nil, fmt.Errorf("new rpc client: %w", err)
+	}
 	return &Client{
-		cfg:      cfg,
-		grpcConn: grpcConn,
+		cfg:       cfg,
+		grpcConn:  grpcConn,
+		rpcClient: rpcClient,
 	}, nil
 }
 
@@ -90,6 +109,14 @@ func (c *Client) AllBalances(ctx context.Context, addr string, options ...Client
 	return resp.Balances, nil
 }
 
+func (c *Client) EndBlockEvents(ctx context.Context, blockHeight int64) ([]abcitypes.Event, error) {
+	resp, err := c.rpcClient.BlockResults(ctx, &blockHeight)
+	if err != nil {
+		return nil, err
+	}
+	return resp.EndBlockEvents, nil
+}
+
 type ClientOptions struct {
 	blockHeight *int64
 }
@@ -115,4 +142,14 @@ func CheckBlockHeight(md metadata.MD, height int64) error {
 		return fmt.Errorf("mismatching block height; got %d, expected %d", h, height)
 	}
 	return nil
+}
+
+type AddTokenRoundTripper struct {
+	rt    http.RoundTripper
+	token string
+}
+
+func (rt AddTokenRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	req.Header.Add("Authorization", rt.token)
+	return rt.rt.RoundTrip(req)
 }
