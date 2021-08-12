@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"math"
 	"net/http"
 	"strconv"
 
@@ -115,6 +116,25 @@ func (c *Client) AllBalances(ctx context.Context, addr string, options ...Client
 	}
 
 	return resp.Balances, nil
+}
+
+func (c *Client) SearchBlockHeights(ctx context.Context, query string) ([]int64, error) {
+	pageSize := 100
+	maxPage := 0
+	var heights []int64
+	for page := 1; maxPage == 0 || page <= maxPage; page++ {
+		resp, err := c.rpcClient.BlockSearch(ctx, query, &page, &pageSize, "asc")
+		if err != nil {
+			return nil, err
+		}
+		for _, block := range resp.Blocks {
+			heights = append(heights, block.Block.Height)
+		}
+		if maxPage == 0 {
+			maxPage = int(math.Ceil(float64(resp.TotalCount) / float64(pageSize)))
+		}
+	}
+	return heights, nil
 }
 
 func (c *Client) EndBlockEvents(ctx context.Context, blockHeight int64) ([]abcitypes.Event, error) {

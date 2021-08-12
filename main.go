@@ -56,7 +56,16 @@ func main() {
 				return fmt.Errorf("begin height must be less or equal than end height")
 			}
 
-			fmt.Printf("begin height = %d, end height = %d. continue? [y/N] ", beginHeight, endHeight)
+			fmt.Printf("begin height = %d, end height = %d\n", beginHeight, endHeight)
+
+			query := fmt.Sprintf(`swap_transacted.pool_id EXISTS AND block.height >= %d AND block.height <= %d`, beginHeight, endHeight)
+			heights, err := c.SearchBlockHeights(ctx, query)
+			if err != nil {
+				return fmt.Errorf("search block heights: %w", err)
+			}
+			fmt.Printf("searched heights = %v\n", heights)
+
+			fmt.Print("continue? [y/N] ")
 			var ans string
 			if _, err := fmt.Scanln(&ans); err != nil {
 				return fmt.Errorf("read input: %w", err)
@@ -71,9 +80,11 @@ func main() {
 			}
 			defer outFile.Close()
 
-			bar := progressbar.Default(endHeight - beginHeight + 1)
+			fmt.Printf("writing output to %s\n", outFile.Name())
 
-			for height := beginHeight; height <= endHeight; height++ {
+			bar := progressbar.Default(int64(len(heights)))
+
+			for _, height := range heights {
 				events, err := c.EndBlockEvents(ctx, height)
 				if err != nil {
 					return fmt.Errorf("get end block events: %w", err)
