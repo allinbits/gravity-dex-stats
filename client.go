@@ -57,6 +57,14 @@ func (c *Client) WithToken(ctx context.Context) context.Context {
 	return metadata.AppendToOutgoingContext(ctx, "Authorization", c.cfg.GRPC.Token)
 }
 
+func (c *Client) LatestBlockHeight(ctx context.Context) (int64, error) {
+	resp, err := c.rpcClient.Status(ctx)
+	if err != nil {
+		return 0, err
+	}
+	return resp.SyncInfo.LatestBlockHeight, nil
+}
+
 func (c *Client) Pools(ctx context.Context, options ...ClientOption) ([]liquiditytypes.Pool, error) {
 	opts := ClientOptions{}
 	for _, opt := range options {
