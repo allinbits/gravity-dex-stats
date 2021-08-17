@@ -133,7 +133,7 @@ func NewSwapTransactedEvent(event abcitypes.Event) (SwapTransactedEvent, error) 
 		if err != nil {
 			return SwapTransactedEvent{}, err
 		}
-		evt.ExchangedOfferCoinFee, err = evt.CoinAttrs(liquiditytypes.AttributeValueDemandCoinDenom, liquiditytypes.AttributeValueOfferCoinFeeAmount)
+		evt.ExchangedOfferCoinFee, err = evt.CoinAttrs(liquiditytypes.AttributeValueOfferCoinDenom, liquiditytypes.AttributeValueOfferCoinFeeAmount)
 		if err != nil {
 			return SwapTransactedEvent{}, err
 		}
