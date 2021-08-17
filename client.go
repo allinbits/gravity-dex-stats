@@ -6,6 +6,7 @@ import (
 	"math"
 	"net/http"
 	"strconv"
+	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	grpctypes "github.com/cosmos/cosmos-sdk/types/grpc"
@@ -26,7 +27,9 @@ type Client struct {
 }
 
 func NewClient(cfg ClientConfig) (*Client, error) {
-	grpcConn, err := grpc.Dial(cfg.GRPC.URL, grpc.WithTransportCredentials(credentials.NewTLS(nil)), grpc.WithBlock())
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	grpcConn, err := grpc.DialContext(ctx, cfg.GRPC.URL, grpc.WithTransportCredentials(credentials.NewTLS(nil)), grpc.WithBlock())
 	if err != nil {
 		return nil, fmt.Errorf("dial grpc: %w", err)
 	}
@@ -54,7 +57,7 @@ func (c *Client) Close() error {
 	return c.grpcConn.Close()
 }
 
-func (c *Client) WithToken(ctx context.Context) context.Context {
+func (c *Client) withToken(ctx context.Context) context.Context {
 	return metadata.AppendToOutgoingContext(ctx, "Authorization", c.cfg.GRPC.Token)
 }
 
@@ -78,7 +81,7 @@ func (c *Client) Pools(ctx context.Context, options ...ClientOption) ([]liquidit
 	lqc := liquiditytypes.NewQueryClient(c.grpcConn)
 
 	var md metadata.MD
-	resp, err := lqc.LiquidityPools(c.WithToken(ctx), &liquiditytypes.QueryLiquidityPoolsRequest{}, grpc.Header(&md))
+	resp, err := lqc.LiquidityPools(c.withToken(ctx), &liquiditytypes.QueryLiquidityPoolsRequest{}, grpc.Header(&md))
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +107,7 @@ func (c *Client) AllBalances(ctx context.Context, addr string, options ...Client
 	bqc := banktypes.NewQueryClient(c.grpcConn)
 
 	var md metadata.MD
-	resp, err := bqc.AllBalances(c.WithToken(ctx), &banktypes.QueryAllBalancesRequest{Address: addr}, grpc.Header(&md))
+	resp, err := bqc.AllBalances(c.withToken(ctx), &banktypes.QueryAllBalancesRequest{Address: addr}, grpc.Header(&md))
 	if err != nil {
 		return nil, err
 	}
@@ -116,6 +119,32 @@ func (c *Client) AllBalances(ctx context.Context, addr string, options ...Client
 	}
 
 	return resp.Balances, nil
+}
+
+func (c *Client) Balance(ctx context.Context, addr, denom string, options ...ClientOption) (sdk.Coin, error) {
+	opts := ClientOptions{}
+	for _, opt := range options {
+		opt(&opts)
+	}
+	if opts.blockHeight != nil {
+		ctx = metadata.AppendToOutgoingContext(ctx, grpctypes.GRPCBlockHeightHeader, strconv.FormatInt(*opts.blockHeight, 10))
+	}
+
+	bqc := banktypes.NewQueryClient(c.grpcConn)
+
+	var md metadata.MD
+	resp, err := bqc.Balance(c.withToken(ctx), &banktypes.QueryBalanceRequest{Address: addr, Denom: denom}, grpc.Header(&md))
+	if err != nil {
+		return sdk.Coin{}, err
+	}
+
+	if opts.blockHeight != nil {
+		if err := CheckBlockHeight(md, *opts.blockHeight); err != nil {
+			return sdk.Coin{}, fmt.Errorf("check block height: %w", err)
+		}
+	}
+
+	return *resp.Balance, nil
 }
 
 func (c *Client) SearchBlockHeights(ctx context.Context, query string) ([]int64, error) {
