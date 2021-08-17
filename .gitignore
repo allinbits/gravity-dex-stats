@@ -2,3 +2,4 @@
 config.toml
 *.log
 gravity-dex-stats
+*.csv
