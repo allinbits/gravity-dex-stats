@@ -63,7 +63,11 @@ func main() {
 			if err != nil {
 				return fmt.Errorf("search block heights: %w", err)
 			}
-			fmt.Printf("searched heights = %v\n", heights)
+			if len(heights) == 0 {
+				fmt.Println("no swap events found")
+				return nil
+			}
+			fmt.Printf("searched heights (total %d) = %v\n", len(heights), heights)
 
 			fmt.Print("continue? [y/N] ")
 			var ans string
