@@ -29,18 +29,26 @@ type Client struct {
 func NewClient(cfg ClientConfig) (*Client, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	grpcConn, err := grpc.DialContext(ctx, cfg.GRPC.URL, grpc.WithTransportCredentials(credentials.NewTLS(nil)), grpc.WithBlock())
+	opts := []grpc.DialOption{grpc.WithBlock()}
+	if cfg.GRPC.Insecure {
+		opts = append(opts, grpc.WithInsecure())
+	} else {
+		opts = append(opts, grpc.WithTransportCredentials(credentials.NewTLS(nil)))
+	}
+	grpcConn, err := grpc.DialContext(ctx, cfg.GRPC.URL, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("dial grpc: %w", err)
 	}
 	httpClient := &http.Client{
-		Transport: AddTokenRoundTripper{
-			rt:    http.DefaultTransport,
-			token: cfg.RPC.Token,
-		},
 		CheckRedirect: nil,
 		Jar:           nil,
 		Timeout:       0,
+	}
+	if cfg.RPC.Token != "" {
+		httpClient.Transport = AddTokenRoundTripper{
+			rt:    http.DefaultTransport,
+			token: cfg.RPC.Token,
+		}
 	}
 	rpcClient, err := rpc.NewWithClient(cfg.RPC.URL, "/websocket", httpClient)
 	if err != nil {
@@ -58,6 +66,9 @@ func (c *Client) Close() error {
 }
 
 func (c *Client) withToken(ctx context.Context) context.Context {
+	if c.cfg.GRPC.Token == "" {
+		return ctx
+	}
 	return metadata.AppendToOutgoingContext(ctx, "Authorization", c.cfg.GRPC.Token)
 }
 

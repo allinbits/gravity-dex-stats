@@ -14,8 +14,9 @@ type ClientConfig struct {
 }
 
 type GRPCConfig struct {
-	URL   string
-	Token string
+	URL      string
+	Token    string
+	Insecure bool
 }
 
 type RPCConfig struct {
