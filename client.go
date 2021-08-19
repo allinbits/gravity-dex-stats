@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"sort"
 	"strconv"
 	"time"
 
@@ -156,6 +157,30 @@ func (c *Client) Balance(ctx context.Context, addr, denom string, options ...Cli
 	}
 
 	return *resp.Balance, nil
+}
+
+func (c *Client) BlockTime(ctx context.Context, height int64) (time.Time, error) {
+	resp, err := c.rpcClient.Block(ctx, &height)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return resp.Block.Time, nil
+}
+
+func (c *Client) SearchBlockHeightByTime(ctx context.Context, t time.Time) (int64, error) {
+	endHeight, err := c.LatestBlockHeight(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("get latest block height: %w", err)
+	}
+
+	h := sort.Search(int(endHeight), func(h int) bool {
+		t2, err := c.BlockTime(ctx, int64(h))
+		if err != nil {
+			panic(err)
+		}
+		return t2.After(t)
+	})
+	return int64(h), nil
 }
 
 func (c *Client) SearchBlockHeights(ctx context.Context, query string) ([]int64, error) {

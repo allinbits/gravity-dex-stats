@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/cosmos/cosmos-sdk/codec"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
@@ -25,6 +26,7 @@ func RootCmd() *cobra.Command {
 	cmd.AddCommand(
 		SummaryCmd(),
 		ReadGenesisCmd(),
+		SearchBlockCmd(),
 	)
 	return cmd
 }
@@ -206,8 +208,8 @@ func SummaryCmd() *cobra.Command {
 func ReadGenesisCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "read-genesis [file]",
-		Args:  cobra.ExactArgs(1),
 		Short: "Read genesis file and extract summary",
+		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
@@ -256,6 +258,50 @@ func ReadGenesisCmd() *cobra.Command {
 			for _, pool := range pools {
 				fmt.Printf("pool %d: %d\n", pool.Id, numPoolInvestors[pool.Id])
 			}
+
+			return nil
+		},
+	}
+	return cmd
+}
+
+func SearchBlockCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "search-block [time]",
+		Short: "Search block heights for specific time",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			t, err := time.Parse(time.RFC3339, args[0])
+			if err != nil {
+				return fmt.Errorf("parse time: %w", err)
+			}
+
+			cmd.SilenceUsage = true
+
+			cfg, err := ReadClientConfig("config.toml")
+			if err != nil {
+				return fmt.Errorf("read client config: %w", err)
+			}
+
+			c, err := NewClient(cfg)
+			if err != nil {
+				return fmt.Errorf("new client: %w", err)
+			}
+			defer c.Close()
+
+			ctx := context.Background()
+
+			h, err := c.SearchBlockHeightByTime(ctx, t)
+			if err != nil {
+				return fmt.Errorf("search block height by time: %w", err)
+			}
+
+			t, err = c.BlockTime(ctx, h)
+			if err != nil {
+				return fmt.Errorf("get block time: %w", err)
+			}
+
+			fmt.Printf("Nearest block height is %d, time is %s\n", h, t.Format(time.RFC3339))
 
 			return nil
 		},
