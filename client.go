@@ -174,6 +174,9 @@ func (c *Client) SearchBlockHeightByTime(ctx context.Context, t time.Time) (int6
 	}
 
 	h := sort.Search(int(endHeight), func(h int) bool {
+		if h < 5200791 { // TODO: remove this hard coded minimum height
+			return false
+		}
 		t2, err := c.BlockTime(ctx, int64(h))
 		if err != nil {
 			panic(err)
