@@ -119,41 +119,42 @@ func SummaryCmd() *cobra.Command {
 			}
 			if len(heights) == 0 {
 				fmt.Println("no swap events found")
-			} else {
-				bar = progressbar.Default(int64(len(heights)))
+				return nil
+			}
 
-				for _, height := range heights {
-					events, err := c.EndBlockEvents(ctx, height)
-					if err != nil {
-						return fmt.Errorf("get end block events: %w", err)
-					}
-					for _, event := range events {
-						if event.Type == liquiditytypes.EventTypeSwapTransacted {
-							ste, err := NewSwapTransactedEvent(event)
-							if err != nil {
-								return fmt.Errorf("new swap_transacted event: %w", err)
+			bar = progressbar.Default(int64(len(heights)))
+
+			for _, height := range heights {
+				events, err := c.EndBlockEvents(ctx, height)
+				if err != nil {
+					return fmt.Errorf("get end block events: %w", err)
+				}
+				for _, event := range events {
+					if event.Type == liquiditytypes.EventTypeSwapTransacted {
+						ste, err := NewSwapTransactedEvent(event)
+						if err != nil {
+							return fmt.Errorf("new swap_transacted event: %w", err)
+						}
+						if ste.Success {
+							ps, ok := summaries[ste.PoolID]
+							if !ok {
+								return fmt.Errorf("pool id not found: %d", ste.PoolID)
 							}
-							if ste.Success {
-								ps, ok := summaries[ste.PoolID]
-								if !ok {
-									return fmt.Errorf("pool id not found: %d", ste.PoolID)
-								}
-								var i int
-								if ste.ExchangedOfferCoin.Denom == ps.Swaps[0].OfferCoin.Denom {
-									i = 0
-								} else {
-									i = 1
-								}
-								ps.Swaps[i].OfferCoin = ps.Swaps[i].OfferCoin.Add(ste.ExchangedOfferCoin)
-								ps.Swaps[i].OfferCoinFee = ps.Swaps[i].OfferCoinFee.Add(ste.ExchangedOfferCoinFee)
-								ps.Swaps[i].DemandCoin = ps.Swaps[i].DemandCoin.Add(ste.ExchangedDemandCoin)
-								ps.Swaps[i].DemandCoinFee = ps.Swaps[i].DemandCoinFee.Add(ste.ExchangedDemandCoinFee)
-								swapRequesters[ste.SwapRequesterAddress] = struct{}{}
+							var i int
+							if ste.ExchangedOfferCoin.Denom == ps.Swaps[0].OfferCoin.Denom {
+								i = 0
+							} else {
+								i = 1
 							}
+							ps.Swaps[i].OfferCoin = ps.Swaps[i].OfferCoin.Add(ste.ExchangedOfferCoin)
+							ps.Swaps[i].OfferCoinFee = ps.Swaps[i].OfferCoinFee.Add(ste.ExchangedOfferCoinFee)
+							ps.Swaps[i].DemandCoin = ps.Swaps[i].DemandCoin.Add(ste.ExchangedDemandCoin)
+							ps.Swaps[i].DemandCoinFee = ps.Swaps[i].DemandCoinFee.Add(ste.ExchangedDemandCoinFee)
+							swapRequesters[ste.SwapRequesterAddress] = struct{}{}
 						}
 					}
-					_ = bar.Add(1)
 				}
+				_ = bar.Add(1)
 			}
 
 			fmt.Printf("Gravity DEX Summary (block height: %d)\n", endHeight)
