@@ -245,11 +245,13 @@ func ReadGenesisCmd() *cobra.Command {
 			genState := banktypes.GetGenesisStateFromAppState(codec.NewProtoCodec(codectypes.NewInterfaceRegistry()), appState)
 
 			numPoolInvestors := make(map[uint64]int) // (pool id) => (num pool investors)
+			totalPoolInvestors := make(map[string]struct{})
 
 			for _, balance := range genState.Balances {
 				for poolCoinDenom, poolID := range poolCoinDenomSet {
 					if balance.Coins.AmountOf(poolCoinDenom).IsPositive() {
 						numPoolInvestors[poolID]++
+						totalPoolInvestors[balance.Address] = struct{}{}
 					}
 				}
 			}
@@ -259,6 +261,7 @@ func ReadGenesisCmd() *cobra.Command {
 			for _, pool := range pools {
 				fmt.Printf("pool %d: %d\n", pool.Id, numPoolInvestors[pool.Id])
 			}
+			fmt.Printf("total: %d\n", len(totalPoolInvestors))
 
 			return nil
 		},
